@@ -69,6 +69,11 @@ Explicación de cómo se resolvió el problema:
 
 ## 📥 Clonar
 
+```bash
+ https://github.com/Oscarsl10/Grupo7_Caicedo_Sierra.git
+
+```
+
 ---
 
 ## 👥 Actores del Proyecto

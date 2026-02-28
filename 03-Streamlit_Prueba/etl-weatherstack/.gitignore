@@ -1,0 +1,18 @@
+# Entorno virtual
+venv/
+
+# Variables sensibles
+.env
+
+# Archivos Python
+__pycache__/
+*.pyc
+
+# Logs
+logs/
+
+# Datos
+data/
+
+# Jupyter
+.ipynb_checkpoints

@@ -1,0 +1,4 @@
+ciudad,pais,latitud,longitud,temperatura,sensacion_termica,humedad,velocidad_viento,descripcion,fecha_extraccion,codigo_tiempo
+Bogota,Colombia,4.600,-74.083,15,15,67,6,Partly cloudy,2026-02-20T19:40:19.633985,116
+Cali,Colombia,3.437,-76.523,27,32,66,9,Partly cloudy,2026-02-20T19:40:20.616713,116
+Cartagena,Colombia,10.400,-75.514,30,38,70,21,Clear ,2026-02-20T19:40:21.844273,113

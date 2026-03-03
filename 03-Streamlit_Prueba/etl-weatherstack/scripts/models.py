@@ -34,3 +34,8 @@ class MetricasETL(Base):
 
     id = Column(Integer, primary_key=True)
     fecha_ejecucion = Column(DateTime, default=datetime.utcnow)
+    estado = Column(String(50))
+    registros_extraidos = Column(Integer)
+    registros_guardados = Column(Integer)
+    registros_fallidos = Column(Integer)
+    tiempo_ejecucion_segundos = Column(Float)

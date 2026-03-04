@@ -2,6 +2,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.io as pio
+
+# usar el renderer incorporado en vez de cargar plotly desde CDN
+pio.renderers.default = "iframe_connected"
+
 from datetime import datetime, timedelta
 import os
 import sys

@@ -94,11 +94,6 @@ if df is None:
     st.error("❌ No se pudieron obtener datos de ninguna fuente")
     st.stop()
 
-# depuración para nube
-with st.expander("Debug datos cargados"):
-    st.write("shape:", df.shape)
-    st.write(df.head())
-    st.write(df.dtypes)
 
 # normalizar encabezados y tipos
 if 'fecha_lanzamiento' in df.columns:

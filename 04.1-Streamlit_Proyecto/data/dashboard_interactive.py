@@ -75,12 +75,30 @@ def load_from_db():
         raise ConnectionError(f"No se pudo obtener datos de la base de datos: {e}")
 
 # intentar cargar datos
+
+df = None
 try:
     df = load_from_db()
 except Exception as err:
-    st.error("❌ Error al leer la base de datos")
-    st.error(str(err))
+    st.warning("⚠️ No se pudo leer la base de datos")
+    st.warning(str(err))
+
+# si df es None o está vacío, intentamos cargar CSV de respaldo
+if df is None or (hasattr(df, 'shape') and df.shape[0] == 0):
+    csv_path = os.path.join(os.path.dirname(__file__), "data", "videojuegos_transformed.csv")
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+        st.info("ℹ️ Usando CSV transformado como fallback")
+
+if df is None:
+    st.error("❌ No se pudieron obtener datos de ninguna fuente")
     st.stop()
+
+# depuración para nube
+with st.expander("Debug datos cargados"):
+    st.write("shape:", df.shape)
+    st.write(df.head())
+    st.write(df.dtypes)
 
 # normalizar encabezados y tipos
 if 'fecha_lanzamiento' in df.columns:

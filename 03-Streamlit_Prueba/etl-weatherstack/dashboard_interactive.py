@@ -34,7 +34,7 @@ if not ciudades_disponibles:
 ciudades_seleccionadas = st.sidebar.multiselect(
     "🏙️ Ciudades a Mostrar",
     options=ciudades_disponibles,
-    default=ciudades_disponibles[:2]
+    default=ciudades_disponibles
 )
 
 fecha_inicio = st.sidebar.date_input(
@@ -46,6 +46,10 @@ fecha_fin = st.sidebar.date_input(
     "📅 Hasta:",
     value=datetime.now()
 )
+
+# convertir date -> datetime
+fecha_inicio = datetime.combine(fecha_inicio, datetime.min.time())
+fecha_fin = datetime.combine(fecha_fin, datetime.max.time())
 
 temp_min = st.sidebar.slider("🌡️ Temp Mín (°C):", -50, 50, -10)
 temp_max = st.sidebar.slider("🌡️ Temp Máx (°C):", -50, 50, 40)

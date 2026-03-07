@@ -3,12 +3,30 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from sqlalchemy import func, and_
+from sqlalchemy import and_
 import sys
+
 sys.path.insert(0, '.')
 
-from scripts.database import SessionLocal
-from scripts.models import Ciudad, RegistroClima
+from scripts.database import SessionLocal, engine
+from scripts.models import Ciudad, RegistroClima, Base
+from load_to_db import cargar_csv_a_bd
+
+# =============================
+# CONFIGURACIÓN BASE DE DATOS
+# =============================
+
+Base.metadata.create_all(bind=engine)
+
+db = SessionLocal()
+
+# Si la base está vacía cargar datos del CSV
+if db.query(Ciudad).count() == 0:
+    cargar_csv_a_bd()
+
+# =============================
+# CONFIG STREAMLIT
+# =============================
 
 st.set_page_config(
     page_title="Dashboard Interactivo",
@@ -18,11 +36,10 @@ st.set_page_config(
 
 st.title("🎛️ Dashboard Interactivo - Control Total")
 
-db = SessionLocal()
-
 # =============================
 # SIDEBAR CONTROLS
 # =============================
+
 st.sidebar.markdown("### 🔧 Controles")
 
 ciudades_disponibles = [c.nombre for c in db.query(Ciudad).all()]
@@ -47,7 +64,7 @@ fecha_fin = st.sidebar.date_input(
     value=datetime.now()
 )
 
-# convertir date -> datetime
+# Convertir date → datetime
 fecha_inicio = datetime.combine(fecha_inicio, datetime.min.time())
 fecha_fin = datetime.combine(fecha_fin, datetime.max.time())
 
@@ -55,8 +72,9 @@ temp_min = st.sidebar.slider("🌡️ Temp Mín (°C):", -50, 50, -10)
 temp_max = st.sidebar.slider("🌡️ Temp Máx (°C):", -50, 50, 40)
 
 # =============================
-# QUERY FILTRADA
+# CONSULTA BASE DE DATOS
 # =============================
+
 registros_filtrados = db.query(
     RegistroClima,
     Ciudad.nombre
@@ -73,24 +91,26 @@ registros_filtrados = db.query(
 # =============================
 # DATAFRAME
 # =============================
+
 data = []
 
 for registro, ciudad_nombre in registros_filtrados:
     data.append({
-        'Ciudad': ciudad_nombre,
-        'Temperatura': registro.temperatura,
-        'Sensación': registro.sensacion_termica,
-        'Humedad': registro.humedad,
-        'Viento': registro.velocidad_viento,
-        'Descripción': registro.descripcion,
-        'Fecha': registro.fecha_extraccion
+        "Ciudad": ciudad_nombre,
+        "Temperatura": registro.temperatura,
+        "Sensación": registro.sensacion_termica,
+        "Humedad": registro.humedad,
+        "Viento": registro.velocidad_viento,
+        "Descripción": registro.descripcion,
+        "Fecha": registro.fecha_extraccion
     })
 
-df = pd.DataFrame(data) if data else pd.DataFrame()
+df = pd.DataFrame(data)
 
 # =============================
 # DASHBOARD
 # =============================
+
 if not df.empty:
 
     st.markdown("### 📊 Indicadores Clave")
@@ -110,35 +130,38 @@ if not df.empty:
     with col1:
         fig = px.box(
             df,
-            x='Ciudad',
-            y='Temperatura',
-            color='Ciudad',
-            title='Distribución de Temperaturas'
+            x="Ciudad",
+            y="Temperatura",
+            color="Ciudad",
+            title="Distribución de Temperaturas"
         )
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
-        humedad_ciudad = df.groupby('Ciudad')['Humedad'].mean().reset_index()
+        humedad_ciudad = df.groupby("Ciudad")["Humedad"].mean().reset_index()
+
         fig = px.bar(
             humedad_ciudad,
-            x='Ciudad',
-            y='Humedad',
-            color='Humedad',
-            color_continuous_scale='Blues'
+            x="Ciudad",
+            y="Humedad",
+            color="Humedad",
+            color_continuous_scale="Blues",
+            title="Promedio de Humedad por Ciudad"
         )
+
         st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
 
     st.markdown("#### 📈 Evolución Temporal")
 
-    df['Fecha'] = pd.to_datetime(df['Fecha'])
+    df["Fecha"] = pd.to_datetime(df["Fecha"])
 
     fig = px.line(
         df,
-        x='Fecha',
-        y='Temperatura',
-        color='Ciudad',
+        x="Fecha",
+        y="Temperatura",
+        color="Ciudad",
         markers=True
     )
 
@@ -153,7 +176,7 @@ if not df.empty:
     columnas_mostrar = st.multiselect(
         "Columnas a mostrar:",
         df.columns.tolist(),
-        default=['Ciudad', 'Temperatura', 'Humedad', 'Descripción', 'Fecha']
+        default=["Ciudad", "Temperatura", "Humedad", "Descripción", "Fecha"]
     )
 
     if mostrar_todos:

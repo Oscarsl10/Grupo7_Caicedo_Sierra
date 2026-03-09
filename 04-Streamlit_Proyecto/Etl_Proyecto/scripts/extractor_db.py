@@ -2,7 +2,11 @@ import requests
 import pandas as pd
 import os
 import logging
+from datetime import datetime
 from dotenv import load_dotenv
+
+# Importar conexión a la BD
+from scripts.database import engine
 
 # Cargar variables de entorno
 load_dotenv()
@@ -10,13 +14,13 @@ load_dotenv()
 API_KEY = os.getenv("RAWG_API_KEY")
 BASE_URL = os.getenv("BASE_URL")
 
+# Directorios
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(BASE_DIR, "data")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 
-os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(LOGS_DIR, exist_ok=True)
 
+# Configuración de logs
 logging.basicConfig(
     level=logging.INFO,
     handlers=[
@@ -28,7 +32,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 try:
+
+    logger.info("Extrayendo datos de la API RAWG...")
+
     url = f"{BASE_URL}/games"
+
     params = {
         "key": API_KEY,
         "page_size": 40
@@ -39,18 +47,10 @@ try:
 
     data = response.json()
 
-    # Guardar JSON crudo
-    json_path = os.path.join(DATA_DIR, "videojuegos.json")
-    with open(json_path, "w", encoding="utf-8") as f:
-        import json
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-    logger.info("JSON crudo guardado correctamente")
-
-    # Normalizar datos importantes
     results = data["results"]
 
     videojuegos = []
+
     for game in results:
         videojuegos.append({
             "nombre": game["name"],
@@ -59,12 +59,25 @@ try:
             "metacritic": game.get("metacritic")
         })
 
+    # Crear DataFrame
     df = pd.DataFrame(videojuegos)
 
-    clean_path = os.path.join(DATA_DIR, "videojuegos_clean.csv")
-    df.to_csv(clean_path, index=False)
+    logger.info(f"Se extrajeron {len(df)} videojuegos")
 
-    logger.info("CSV limpio generado correctamente")
+    # Agregar fecha de creación
+    df["fecha_creacion"] = datetime.utcnow()
+
+    logger.info("Guardando datos en PostgreSQL...")
+
+    # Insertar en PostgreSQL
+    df.to_sql(
+        "videojuegos",
+        engine,
+        if_exists="append",
+        index=False
+    )
+
+    logger.info("Datos guardados correctamente en PostgreSQL")
 
 except Exception as e:
     logger.error(f"Error en extractor: {e}")

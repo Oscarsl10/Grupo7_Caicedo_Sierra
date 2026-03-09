@@ -2,10 +2,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
+from sqlalchemy import select
 from datetime import datetime
-import os
-import sys
+
+from scripts.database import engine
+from scripts.models import VideojuegoTop
 
 # Configuración de la página
 st.set_page_config(
@@ -19,27 +20,33 @@ st.set_page_config(
 st.title("🎮 Dashboard de Videojuegos - ETL RAWG")
 st.markdown("---")
 
-# Cargar datos
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-
 try:
-    # Cargar CSV transformado (top 20 juegos por rating)
-    transformed_path = os.path.join(DATA_DIR, "videojuegos_transformed.csv")
-    
-    if os.path.exists(transformed_path):
-        df = pd.read_csv(transformed_path)
-        df['fecha_lanzamiento'] = pd.to_datetime(df['fecha_lanzamiento'], errors='coerce')
-    else:
-        st.warning("Archivo de datos transformados no encontrado. Cargando datos crudos...")
-        clean_path = os.path.join(DATA_DIR, "videojuegos_clean.csv")
-        df = pd.read_csv(clean_path)
-        df['fecha_lanzamiento'] = pd.to_datetime(df['fecha_lanzamiento'], errors='coerce')
 
-    # Sidebar con filtros
+    # =============================
+    # CARGAR DATOS DESDE LA BASE
+    # =============================
+
+    query = select(
+        VideojuegoTop.nombre,
+        VideojuegoTop.fecha_lanzamiento,
+        VideojuegoTop.rating,
+        VideojuegoTop.metacritic
+    )
+
+    df = pd.read_sql(query, engine)
+
+    if df.empty:
+        st.warning("La tabla videojuegos_top está vacía. Ejecuta primero el ETL.")
+        st.stop()
+
+    df['fecha_lanzamiento'] = pd.to_datetime(df['fecha_lanzamiento'], errors='coerce')
+
+    # =============================
+    # SIDEBAR - FILTROS
+    # =============================
+
     st.sidebar.title("🔧 Filtros")
-    
-    # Filtro por rango de rating
+
     min_rating, max_rating = st.sidebar.slider(
         "Rango de Rating:",
         min_value=float(df['rating'].min()),
@@ -47,32 +54,39 @@ try:
         value=(float(df['rating'].min()), float(df['rating'].max())),
         step=0.1
     )
-    
-    # Filtro por años de lanzamiento
+
     min_año = int(df['fecha_lanzamiento'].dt.year.min())
     max_año = int(df['fecha_lanzamiento'].dt.year.max())
+
     año_filtro = st.sidebar.slider(
         "Año de Lanzamiento:",
         min_value=min_año,
         max_value=max_año,
         value=(min_año, max_año)
     )
-    
-    # Filtro por Metacritic
+
     solo_metacritic = st.sidebar.checkbox("Solo juegos con Metacritic", value=False)
-    
-    # Aplicar filtros
+
+    # =============================
+    # APLICAR FILTROS
+    # =============================
+
     df_filtrado = df[
-        (df['rating'] >= min_rating) & 
+        (df['rating'] >= min_rating) &
         (df['rating'] <= max_rating) &
         (df['fecha_lanzamiento'].dt.year >= año_filtro[0]) &
         (df['fecha_lanzamiento'].dt.year <= año_filtro[1])
     ]
-    
+
     if solo_metacritic:
         df_filtrado = df_filtrado[df_filtrado['metacritic'].notna()]
 
+    # =============================
+    # MÉTRICAS PRINCIPALES
+    # =============================
+
     st.markdown("### 📊 Métricas Principales")
+
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
@@ -85,6 +99,7 @@ try:
 
     with col2:
         metacritic_promedio = df_filtrado['metacritic'].mean()
+
         if not pd.isna(metacritic_promedio):
             st.metric(
                 label="🎯 Metacritic Promedio",
@@ -96,6 +111,7 @@ try:
 
     with col3:
         total_juegos = len(df_filtrado)
+
         st.metric(
             label="🎮 Total de Juegos",
             value=total_juegos,
@@ -104,6 +120,7 @@ try:
 
     with col4:
         años_representados = df_filtrado['fecha_lanzamiento'].dt.year.nunique()
+
         st.metric(
             label="📅 Años Representados",
             value=años_representados
@@ -111,14 +128,19 @@ try:
 
     st.markdown("---")
 
-    # Gráficas
+    # =============================
+    # VISUALIZACIONES
+    # =============================
+
     st.subheader("📈 Visualizaciones")
-    
+
     col1, col2 = st.columns(2)
 
-    # Gráfica 1: Top 10 Juegos por Rating
+    # Top 10 Rating
     with col1:
+
         top_10_rating = df_filtrado.nlargest(10, 'rating')[['nombre', 'rating']].sort_values('rating')
+
         fig_rating = px.bar(
             top_10_rating,
             y='nombre',
@@ -128,17 +150,22 @@ try:
             color='rating',
             color_continuous_scale='Viridis'
         )
+
         fig_rating.update_layout(
             xaxis_title="Rating",
             yaxis_title="Juego",
             height=400
         )
+
         st.plotly_chart(fig_rating, use_container_width=True)
 
-    # Gráfica 2: Rating vs Metacritic
+    # Scatter rating vs metacritic
     with col2:
+
         df_con_metacritic = df_filtrado[df_filtrado['metacritic'].notna()]
+
         if len(df_con_metacritic) > 0:
+
             fig_scatter = px.scatter(
                 df_con_metacritic,
                 x='rating',
@@ -146,68 +173,83 @@ try:
                 hover_data=['nombre'],
                 title="Rating RAWG vs Metacritic",
                 color='rating',
-                color_continuous_scale='RdYlGn',
-                size_max=10
+                color_continuous_scale='RdYlGn'
             )
+
             fig_scatter.update_layout(
                 xaxis_title="Rating RAWG",
                 yaxis_title="Metacritic Score",
                 height=400
             )
+
             st.plotly_chart(fig_scatter, use_container_width=True)
+
         else:
             st.info("No hay datos de Metacritic disponibles para la selección actual")
 
     st.markdown("---")
 
-    # Gráficas de tendencias
+    # =============================
+    # SEGUNDA FILA DE GRÁFICAS
+    # =============================
+
     col1, col2 = st.columns(2)
 
-    # Gráfica 3: Distribución de Ratings
+    # Distribución de ratings
     with col1:
+
         fig_dist = px.histogram(
             df_filtrado,
             x='rating',
             nbins=20,
-            title="Distribución de Ratings",
-            color_discrete_sequence=['#636EFA']
+            title="Distribución de Ratings"
         )
+
         fig_dist.update_layout(
             xaxis_title="Rating",
             yaxis_title="Cantidad de Juegos",
             height=400
         )
+
         st.plotly_chart(fig_dist, use_container_width=True)
 
-    # Gráfica 4: Juegos por Año
+    # Juegos por año
     with col2:
+
         juegos_por_año = df_filtrado.groupby(df_filtrado['fecha_lanzamiento'].dt.year).size().reset_index()
+
         juegos_por_año.columns = ['Año', 'Cantidad']
+
         fig_año = px.line(
             juegos_por_año,
             x='Año',
             y='Cantidad',
             title="Cantidad de Juegos por Año de Lanzamiento",
-            markers=True,
-            color_discrete_sequence=['#EF553B']
+            markers=True
         )
+
         fig_año.update_layout(
             xaxis_title="Año",
             yaxis_title="Cantidad",
             height=400
         )
+
         st.plotly_chart(fig_año, use_container_width=True)
 
     st.markdown("---")
 
-    # Tabla de datos detallada
+    # =============================
+    # TABLA DETALLADA
+    # =============================
+
     st.subheader("📋 Datos Detallados")
-    
-    # Preparar datos para mostrar
+
     df_display = df_filtrado[['nombre', 'fecha_lanzamiento', 'rating', 'metacritic']].copy()
+
     df_display['fecha_lanzamiento'] = df_display['fecha_lanzamiento'].dt.strftime('%Y-%m-%d')
+
     df_display = df_display.sort_values('rating', ascending=False)
-    
+
     st.dataframe(
         df_display,
         use_container_width=True,
@@ -215,14 +257,19 @@ try:
         hide_index=True
     )
 
-    # Estadísticas adicionales
+    # =============================
+    # ESTADÍSTICAS AVANZADAS
+    # =============================
+
     st.markdown("---")
     st.subheader("📊 Estadísticas Avanzadas")
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
+
         st.write("**Estadísticas de Rating:**")
+
         stats_rating = {
             "Mínimo": f"{df_filtrado['rating'].min():.2f}",
             "Máximo": f"{df_filtrado['rating'].max():.2f}",
@@ -230,13 +277,18 @@ try:
             "Mediana": f"{df_filtrado['rating'].median():.2f}",
             "Desv. Estándar": f"{df_filtrado['rating'].std():.2f}"
         }
+
         for key, value in stats_rating.items():
             st.write(f"• {key}: {value}")
-    
+
     with col2:
+
         if df_filtrado['metacritic'].notna().any():
+
             st.write("**Estadísticas de Metacritic:**")
+
             df_meta = df_filtrado[df_filtrado['metacritic'].notna()]
+
             stats_meta = {
                 "Mínimo": f"{df_meta['metacritic'].min():.0f}",
                 "Máximo": f"{df_meta['metacritic'].max():.0f}",
@@ -244,13 +296,12 @@ try:
                 "Mediana": f"{df_meta['metacritic'].median():.0f}",
                 "Desv. Estándar": f"{df_meta['metacritic'].std():.2f}"
             }
+
             for key, value in stats_meta.items():
                 st.write(f"• {key}: {value}")
+
         else:
             st.info("No hay suficientes datos de Metacritic")
 
-except FileNotFoundError as e:
-    st.error(f"❌ Error: No se encontraron los archivos de datos. {e}")
-    st.info("Asegúrate de ejecutar primero: extractor.py y transformador.py")
 except Exception as e:
     st.error(f"❌ Error al cargar el dashboard: {e}")

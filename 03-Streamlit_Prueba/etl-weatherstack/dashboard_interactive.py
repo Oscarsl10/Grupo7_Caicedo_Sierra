@@ -10,7 +10,6 @@ sys.path.insert(0, '.')
 
 from scripts.database import SessionLocal, engine
 from scripts.models import Ciudad, RegistroClima, Base
-from load_to_db import cargar_csv_a_bd
 
 # =============================
 # CONFIGURACIÓN BASE DE DATOS
@@ -19,10 +18,6 @@ from load_to_db import cargar_csv_a_bd
 Base.metadata.create_all(bind=engine)
 
 db = SessionLocal()
-
-# Si la base está vacía cargar datos del CSV
-if db.query(Ciudad).count() == 0:
-    cargar_csv_a_bd()
 
 # =============================
 # CONFIG STREAMLIT
@@ -45,7 +40,7 @@ st.sidebar.markdown("### 🔧 Controles")
 ciudades_disponibles = [c.nombre for c in db.query(Ciudad).all()]
 
 if not ciudades_disponibles:
-    st.warning("No hay ciudades registradas en la base de datos")
+    st.warning("⚠️ No hay datos en la base de datos. Ejecuta primero el ETL.")
     st.stop()
 
 ciudades_seleccionadas = st.sidebar.multiselect(

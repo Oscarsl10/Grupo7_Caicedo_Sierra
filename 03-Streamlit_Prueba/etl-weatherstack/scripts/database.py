@@ -1,19 +1,22 @@
 import os
-from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, MetaData, text
 from sqlalchemy.orm import sessionmaker, declarative_base
+import logging
 
-# obtener ruta del proyecto
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv()
 
-# ruta completa de la base de datos
-DB_PATH = os.path.join(BASE_DIR, "weather_etl.db")
+logger = logging.getLogger(__name__)
 
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -22,3 +25,23 @@ SessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+
+metadata = MetaData()
+metadata.reflect(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def test_connection():
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+            logger.info("Conexión exitosa a PostgreSQL")
+            return True
+    except Exception as e:
+        logger.error(f"Error conectando: {e}")
+        return False

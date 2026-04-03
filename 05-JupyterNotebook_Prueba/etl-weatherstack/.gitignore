@@ -1,0 +1,30 @@
+# Entorno virtual
+venv/
+
+# Variables sensibles
+.env
+
+# Archivos Python
+__pycache__/
+*.pyc
+
+# Logs
+logs/
+
+*.db
+
+# Jupyter
+.ipynb_checkpoints
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Datos generados
+
+data/
+data/graficas
+data/*.csv
+data/*.json
+
+
+

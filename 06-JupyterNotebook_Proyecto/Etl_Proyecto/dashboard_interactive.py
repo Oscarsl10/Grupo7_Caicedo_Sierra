@@ -56,9 +56,46 @@ def load_from_db():
     )
 
     df["rating"] = pd.to_numeric(df["rating"], errors="coerce")
+    df["metacritic"] = pd.to_numeric(df["metacritic"], errors="coerce")
+    df["ratings_count"] = pd.to_numeric(df["ratings_count"], errors="coerce")
+    df["added"] = pd.to_numeric(df["added"], errors="coerce")
+    df["playtime"] = pd.to_numeric(df["playtime"], errors="coerce")
+    df["rating_top"] = pd.to_numeric(df["rating_top"], errors="coerce")
 
     if "metacritic" not in df.columns:
         df["metacritic"] = pd.NA
+
+    # Procesar datos JSON para nuevos campos
+    import json
+    import ast
+
+    def safe_json_loads(x):
+        if pd.isna(x):
+            return []
+        try:
+            if isinstance(x, str):
+                # Intentar parsear como JSON primero
+                return json.loads(x)
+            else:
+                return x
+        except (json.JSONDecodeError, TypeError):
+            try:
+                # Intentar parsear como literal de Python
+                return ast.literal_eval(x)
+            except (ValueError, SyntaxError):
+                return []
+
+    # Procesar campos JSON si existen
+    json_fields = ['genres', 'platforms', 'developers', 'publishers']
+    for field in json_fields:
+        if field in df.columns:
+            df[f'{field}_list'] = df[field].apply(safe_json_loads)
+            df[f'{field}_names'] = df[f'{field}_list'].apply(
+                lambda x: [item.get('name', item) if isinstance(item, dict) else str(item) for item in x] if isinstance(x, list) else []
+            )
+            df[f'{field}_str'] = df[f'{field}_names'].apply(
+                lambda x: ', '.join(x) if x else 'N/A'
+            )
 
     return df
 
@@ -187,6 +224,9 @@ else:
 
     with col3:
         st.metric("⭐ Rating Prom", f"{df_filt['rating'].mean():.2f}")
+        st.metric("📊 Ratings Count Prom", f"{df_filt['ratings_count'].mean():.0f}")
+        st.metric("➕ Added Prom", f"{df_filt['added'].mean():.0f}")
+        st.metric("⏱️ Playtime Prom", f"{df_filt['playtime'].mean():.1f}h")
 
     with col4:
 
@@ -237,24 +277,102 @@ else:
     st.markdown("---")
 
     # ===============================
-    # EVOLUCIÓN
+    # ANÁLISIS DE DESARROLLADORES Y PUBLISHERS
     # ===============================
 
-    if df_filt["fecha_lanzamiento"].notna().any():
+    st.markdown("### 🏗️ Análisis de Desarrolladores y Publishers")
 
-        df_filt["Año"] = df_filt["fecha_lanzamiento"].dt.year
+    col1, col2 = st.columns(2)
 
-        temp = df_filt.groupby("Año")["rating"].mean().reset_index()
+    with col1:
+        if 'developers_names' in df_filt.columns:
+            dev_counts = df_filt['developers_names'].explode().value_counts().head(15)
+            if not dev_counts.empty:
+                fig = px.bar(
+                    dev_counts.reset_index(),
+                    x="count",
+                    y="developers_names",
+                    orientation="h",
+                    color="count",
+                    color_continuous_scale="Blues",
+                    title="Top 15 Desarrolladores"
+                )
+                fig.update_layout(yaxis_title="Desarrollador", xaxis_title="Cantidad de Juegos")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No hay datos de desarrolladores")
+        else:
+            st.info("Campo 'developers' no disponible")
 
-        fig = px.line(
-            temp,
-            x="Año",
-            y="rating",
-            markers=True,
-            title="Rating Promedio por Año"
-        )
+    with col2:
+        if 'publishers_names' in df_filt.columns:
+            pub_counts = df_filt['publishers_names'].explode().value_counts().head(15)
+            if not pub_counts.empty:
+                fig = px.bar(
+                    pub_counts.reset_index(),
+                    x="count",
+                    y="publishers_names",
+                    orientation="h",
+                    color="count",
+                    color_continuous_scale="Greens",
+                    title="Top 15 Publishers"
+                )
+                fig.update_layout(yaxis_title="Publisher", xaxis_title="Cantidad de Juegos")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No hay datos de publishers")
+        else:
+            st.info("Campo 'publishers' no disponible")
 
-        st.plotly_chart(fig, use_container_width=True)
+    st.markdown("---")
+
+    # ===============================
+    # ANÁLISIS DE GÉNEROS Y PLATAFORMAS
+    # ===============================
+
+    st.markdown("### 🎭 Análisis de Géneros y Plataformas")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if 'genres_names' in df_filt.columns:
+            genre_counts = df_filt['genres_names'].explode().value_counts().head(15)
+            if not genre_counts.empty:
+                fig = px.bar(
+                    genre_counts.reset_index(),
+                    x="count",
+                    y="genres_names",
+                    orientation="h",
+                    color="count",
+                    color_continuous_scale="Purples",
+                    title="Top 15 Géneros"
+                )
+                fig.update_layout(yaxis_title="Género", xaxis_title="Cantidad de Juegos")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No hay datos de géneros")
+        else:
+            st.info("Campo 'genres' no disponible")
+
+    with col2:
+        if 'platforms_names' in df_filt.columns:
+            platform_counts = df_filt['platforms_names'].explode().value_counts().head(15)
+            if not platform_counts.empty:
+                fig = px.bar(
+                    platform_counts.reset_index(),
+                    x="count",
+                    y="platforms_names",
+                    orientation="h",
+                    color="count",
+                    color_continuous_scale="Oranges",
+                    title="Top 15 Plataformas"
+                )
+                fig.update_layout(yaxis_title="Plataforma", xaxis_title="Cantidad de Juegos")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No hay datos de plataformas")
+        else:
+            st.info("Campo 'platforms' no disponible")
 
     st.markdown("---")
 

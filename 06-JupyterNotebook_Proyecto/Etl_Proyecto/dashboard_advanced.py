@@ -57,9 +57,46 @@ def load_data():
     )
 
     df["rating"] = pd.to_numeric(df["rating"], errors="coerce")
+    df["metacritic"] = pd.to_numeric(df["metacritic"], errors="coerce")
+    df["ratings_count"] = pd.to_numeric(df["ratings_count"], errors="coerce")
+    df["added"] = pd.to_numeric(df["added"], errors="coerce")
+    df["playtime"] = pd.to_numeric(df["playtime"], errors="coerce")
+    df["rating_top"] = pd.to_numeric(df["rating_top"], errors="coerce")
 
     if "metacritic" not in df.columns:
         df["metacritic"] = pd.NA
+
+    # Procesar datos JSON para nuevos campos
+    import json
+    import ast
+
+    def safe_json_loads(x):
+        if pd.isna(x):
+            return []
+        try:
+            if isinstance(x, str):
+                # Intentar parsear como JSON primero
+                return json.loads(x)
+            else:
+                return x
+        except (json.JSONDecodeError, TypeError):
+            try:
+                # Intentar parsear como literal de Python
+                return ast.literal_eval(x)
+            except (ValueError, SyntaxError):
+                return []
+
+    # Procesar campos JSON si existen
+    json_fields = ['genres', 'platforms', 'developers', 'publishers']
+    for field in json_fields:
+        if field in df.columns:
+            df[f'{field}_list'] = df[field].apply(safe_json_loads)
+            df[f'{field}_names'] = df[f'{field}_list'].apply(
+                lambda x: [item.get('name', item) if isinstance(item, dict) else str(item) for item in x] if isinstance(x, list) else []
+            )
+            df[f'{field}_str'] = df[f'{field}_names'].apply(
+                lambda x: ', '.join(x) if x else 'N/A'
+            )
 
     return df
 
@@ -113,17 +150,25 @@ with tab1:
 
     with col2:
         st.metric("⭐ Rating Promedio", f"{df['rating'].mean():.2f}")
+        st.metric("📊 Ratings Count Promedio", f"{df['ratings_count'].mean():.0f}")
+        st.metric("➕ Added Promedio", f"{df['added'].mean():.0f}")
+        st.metric("⏱️ Playtime Promedio", f"{df['playtime'].mean():.1f}h")
 
     with col3:
+        # Calcular métricas para developers y publishers
+        unique_developers = len(set([dev for devs in df['developers_names'] for dev in devs]))
+        unique_publishers = len(set([pub for pubs in df['publishers_names'] for pub in pubs]))
+        
+        st.metric("🛠️ Desarrolladores Únicos", unique_developers)
+        st.metric("🏢 Publishers Únicos", unique_publishers)
 
+    with col4:
+        st.metric("🎯 Con Metacritic", int(df["metacritic"].notna().sum()))
         if df["fecha_lanzamiento"].notna().any():
             latest = df["fecha_lanzamiento"].max()
             st.metric("⏰ Último Lanzamiento", latest.strftime("%Y-%m-%d"))
         else:
             st.metric("⏰ Último Lanzamiento", "N/A")
-
-    with col4:
-        st.metric("🎯 Con Metacritic", int(df["metacritic"].notna().sum()))
 
     st.markdown("---")
 
@@ -166,8 +211,49 @@ with tab1:
 
     st.markdown("---")
 
+    # Nueva fila para visualizaciones de developers y publishers
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Top 15 Developers
+        all_developers = [dev for devs in df['developers_names'] for dev in devs]
+        developer_counts = pd.Series(all_developers).value_counts().head(15)
+        
+        fig_dev = px.bar(
+            developer_counts.reset_index(),
+            x='count',
+            y='index',
+            orientation='h',
+            color='count',
+            color_continuous_scale='Blues',
+            title='Top 15 Desarrolladores',
+            labels={'count': 'Cantidad de Juegos', 'index': 'Desarrollador'}
+        )
+        fig_dev.update_layout(yaxis={'categoryorder': 'total ascending'})
+        st.plotly_chart(fig_dev, use_container_width=True)
+
+    with col2:
+        # Top 15 Publishers
+        all_publishers = [pub for pubs in df['publishers_names'] for pub in pubs]
+        publisher_counts = pd.Series(all_publishers).value_counts().head(15)
+        
+        fig_pub = px.bar(
+            publisher_counts.reset_index(),
+            x='count',
+            y='index',
+            orientation='h',
+            color='count',
+            color_continuous_scale='Reds',
+            title='Top 15 Publishers',
+            labels={'count': 'Cantidad de Juegos', 'index': 'Publisher'}
+        )
+        fig_pub.update_layout(yaxis={'categoryorder': 'total ascending'})
+        st.plotly_chart(fig_pub, use_container_width=True)
+
+    st.markdown("---")
+
     st.dataframe(
-        df.sort_values("rating", ascending=False).head(50),
+        df[['nombre', 'rating', 'metacritic', 'fecha_lanzamiento', 'ratings_count', 'added', 'playtime', 'developers_str', 'publishers_str', 'genres_str', 'platforms_str']].sort_values("rating", ascending=False).head(50),
         use_container_width=True
     )
 

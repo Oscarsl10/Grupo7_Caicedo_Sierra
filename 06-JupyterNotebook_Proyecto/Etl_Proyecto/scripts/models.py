@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, Text
 from scripts.database import Base
 
 
@@ -18,6 +18,24 @@ class Videojuego(Base):
     rating = Column(Float, nullable=True)
 
     metacritic = Column(Float, nullable=True)
+
+    ratings_count = Column(Integer, nullable=True)
+
+    added = Column(Integer, nullable=True)
+
+    playtime = Column(Integer, nullable=True)
+
+    rating_top = Column(Float, nullable=True)
+
+    platforms = Column(Text, nullable=True)  # JSON string
+
+    genres = Column(Text, nullable=True)  # JSON string
+
+    esrb_rating = Column(String(50), nullable=True)
+
+    developers = Column(Text, nullable=True)  # JSON string
+
+    publishers = Column(Text, nullable=True)  # JSON string
 
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
 
@@ -38,6 +56,24 @@ class VideojuegoTop(Base):
     rating = Column(Float, nullable=True)
 
     metacritic = Column(Float, nullable=True)
+
+    ratings_count = Column(Integer, nullable=True)
+
+    added = Column(Integer, nullable=True)
+
+    playtime = Column(Integer, nullable=True)
+
+    rating_top = Column(Float, nullable=True)
+
+    platforms = Column(Text, nullable=True)
+
+    genres = Column(Text, nullable=True)
+
+    esrb_rating = Column(String(50), nullable=True)
+
+    developers = Column(Text, nullable=True)
+
+    publishers = Column(Text, nullable=True)
 
     fecha_transformacion = Column(DateTime, default=datetime.utcnow)
 

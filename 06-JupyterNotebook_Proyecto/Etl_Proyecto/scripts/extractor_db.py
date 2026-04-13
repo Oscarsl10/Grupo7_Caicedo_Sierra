@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import os
 import logging
+import json
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -52,11 +53,34 @@ try:
     videojuegos = []
 
     for game in results:
+        game_id = game["id"]
+        
+        # Obtener detalles adicionales del juego (developers, publishers)
+        detail_url = f"{BASE_URL}/games/{game_id}"
+        detail_params = {"key": API_KEY}
+        
+        try:
+            detail_response = requests.get(detail_url, params=detail_params)
+            detail_response.raise_for_status()
+            game_detail = detail_response.json()
+        except Exception as e:
+            logger.warning(f"Error obteniendo detalles para juego {game_id}: {e}")
+            game_detail = {}
+        
         videojuegos.append({
             "nombre": game["name"],
             "fecha_lanzamiento": game["released"],
             "rating": game["rating"],
-            "metacritic": game.get("metacritic")
+            "metacritic": game.get("metacritic"),
+            "ratings_count": game.get("ratings_count"),
+            "added": game.get("added"),
+            "playtime": game.get("playtime"),
+            "rating_top": game.get("rating_top"),
+            "platforms": json.dumps([p["platform"]["name"] for p in game.get("platforms", [])]),
+            "genres": json.dumps([g["name"] for g in game.get("genres", [])]),
+            "esrb_rating": game.get("esrb_rating", {}).get("name") if game.get("esrb_rating") else None,
+            "developers": json.dumps([d["name"] for d in game_detail.get("developers", [])]),
+            "publishers": json.dumps([p["name"] for p in game_detail.get("publishers", [])])
         })
 
     # Crear DataFrame

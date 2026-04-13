@@ -27,7 +27,7 @@ def transformar_datos():
         logger.info("Leyendo datos desde PostgreSQL...")
 
         query = text("""
-            SELECT nombre, fecha_lanzamiento, rating, metacritic
+            SELECT nombre, fecha_lanzamiento, rating, metacritic, ratings_count, added, playtime, rating_top, platforms, genres, esrb_rating, developers, publishers
             FROM videojuegos
         """)
 
@@ -37,8 +37,8 @@ def transformar_datos():
 
         logger.info(f"Registros extraídos: {registros_extraidos}")
 
-        # Transformación: Top 20 juegos por rating
-        df_top = df.nlargest(20, "rating")
+        # Transformación: Todos los juegos ordenados por rating (para mejor dataset de regresión)
+        df_top = df.sort_values("rating", ascending=False).reset_index(drop=True)
 
         df_top["fecha_transformacion"] = datetime.utcnow()
 

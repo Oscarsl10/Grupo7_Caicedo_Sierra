@@ -33,7 +33,10 @@ try:
         VideojuegoTop.nombre,
         VideojuegoTop.fecha_lanzamiento,
         VideojuegoTop.rating,
-        VideojuegoTop.metacritic
+        VideojuegoTop.metacritic,
+        VideojuegoTop.ratings_count,
+        VideojuegoTop.added,
+        VideojuegoTop.playtime
     )
 
     df = pd.read_sql(query, engine)
@@ -45,9 +48,12 @@ try:
 
     df["rating"] = pd.to_numeric(df["rating"], errors="coerce")
     df["metacritic"] = pd.to_numeric(df["metacritic"], errors="coerce")
+    df["ratings_count"] = pd.to_numeric(df["ratings_count"], errors="coerce")
+    df["added"] = pd.to_numeric(df["added"], errors="coerce")
+    df["playtime"] = pd.to_numeric(df["playtime"], errors="coerce")
     df["rating_scaled"] = df["rating"] * 20
 
-    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
+    fig, axes = plt.subplots(3, 2, figsize=(20, 15))
     fig.suptitle('Análisis de Videojuegos (Top 20)', fontsize=18, fontweight='bold')
 
     # Rating
@@ -60,21 +66,25 @@ try:
     axes[0, 1].set_title("Metacritic (0-100)")
     axes[0, 1].tick_params(axis="x", rotation=90)
 
-    # Fecha lanzamiento
-    axes[1, 0].scatter(df["nombre"], pd.to_datetime(df["fecha_lanzamiento"]))
-    axes[1, 0].set_title("Fecha de lanzamiento")
+    # Ratings Count
+    axes[1, 0].bar(df["nombre"], df["ratings_count"])
+    axes[1, 0].set_title("Ratings Count")
     axes[1, 0].tick_params(axis="x", rotation=90)
 
-    # Comparación rating vs metacritic
-    x = np.arange(len(df))
-    width = 0.35
+    # Added
+    axes[1, 1].bar(df["nombre"], df["added"])
+    axes[1, 1].set_title("Added Count")
+    axes[1, 1].tick_params(axis="x", rotation=90)
 
-    axes[1, 1].bar(x - width/2, df["rating_scaled"], width, label="Rating (0-100)")
-    axes[1, 1].bar(x + width/2, df["metacritic"], width, label="Metacritic")
+    # Playtime
+    axes[2, 0].bar(df["nombre"], df["playtime"])
+    axes[2, 0].set_title("Playtime (hours)")
+    axes[2, 0].tick_params(axis="x", rotation=90)
 
-    axes[1, 1].set_xticks(x)
-    axes[1, 1].set_xticklabels(df["nombre"], rotation=90)
-    axes[1, 1].legend()
+    # Fecha lanzamiento
+    axes[2, 1].scatter(df["nombre"], pd.to_datetime(df["fecha_lanzamiento"]))
+    axes[2, 1].set_title("Fecha de lanzamiento")
+    axes[2, 1].tick_params(axis="x", rotation=90)
 
     plt.tight_layout()
 

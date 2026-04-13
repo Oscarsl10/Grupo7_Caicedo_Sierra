@@ -34,13 +34,59 @@ def cargar_datos():
         VideojuegoTop.nombre,
         VideojuegoTop.fecha_lanzamiento,
         VideojuegoTop.rating,
-        VideojuegoTop.metacritic
+        VideojuegoTop.metacritic,
+        VideojuegoTop.ratings_count,
+        VideojuegoTop.added,
+        VideojuegoTop.playtime,
+        VideojuegoTop.rating_top,
+        VideojuegoTop.genres,
+        VideojuegoTop.platforms,
+        VideojuegoTop.esrb_rating,
+        VideojuegoTop.developers,
+        VideojuegoTop.publishers
     )
 
     df = pd.read_sql(query, engine)
 
     if not df.empty:
         df['fecha_lanzamiento'] = pd.to_datetime(df['fecha_lanzamiento'], errors='coerce')
+
+        # Procesar datos JSON
+        import json
+        import ast
+
+        def safe_json_loads(x):
+            if pd.isna(x):
+                return []
+            try:
+                if isinstance(x, str):
+                    # Intentar parsear como JSON primero
+                    return json.loads(x)
+                else:
+                    return x
+            except (json.JSONDecodeError, TypeError):
+                try:
+                    # Intentar parsear como literal de Python
+                    return ast.literal_eval(x)
+                except (ValueError, SyntaxError):
+                    return []
+
+        df['genres_list'] = df['genres'].apply(safe_json_loads)
+        df['platforms_list'] = df['platforms'].apply(safe_json_loads)
+        df['developers_list'] = df['developers'].apply(safe_json_loads)
+        df['publishers_list'] = df['publishers'].apply(safe_json_loads)
+
+        # Extraer nombres para análisis
+        df['genres_names'] = df['genres_list'].apply(lambda x: [item.get('name', item) if isinstance(item, dict) else str(item) for item in x] if isinstance(x, list) else [])
+        df['platforms_names'] = df['platforms_list'].apply(lambda x: [item.get('name', item) if isinstance(item, dict) else str(item) for item in x] if isinstance(x, list) else [])
+        df['developers_names'] = df['developers_list'].apply(lambda x: [item.get('name', item) if isinstance(item, dict) else str(item) for item in x] if isinstance(x, list) else [])
+        df['publishers_names'] = df['publishers_list'].apply(lambda x: [item.get('name', item) if isinstance(item, dict) else str(item) for item in x] if isinstance(x, list) else [])
+
+        # Crear strings legibles para display
+        df['genres_str'] = df['genres_names'].apply(lambda x: ', '.join(x) if x else 'N/A')
+        df['platforms_str'] = df['platforms_names'].apply(lambda x: ', '.join(x) if x else 'N/A')
+        df['developers_str'] = df['developers_names'].apply(lambda x: ', '.join(x) if x else 'N/A')
+        df['publishers_str'] = df['publishers_names'].apply(lambda x: ', '.join(x) if x else 'N/A')
 
     return df
 
@@ -126,6 +172,27 @@ try:
     with col4:
         st.metric("📅 Años Representados", df_filtrado['fecha_lanzamiento'].dt.year.nunique())
 
+    # Métricas adicionales
+    st.markdown("### 📈 Métricas Adicionales")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        total_devs = df_filtrado['developers_names'].explode().nunique()
+        st.metric("🏗️ Desarrolladores Únicos", total_devs)
+
+    with col2:
+        total_pubs = df_filtrado['publishers_names'].explode().nunique()
+        st.metric("📦 Publishers Únicos", total_pubs)
+
+    with col3:
+        avg_genres = df_filtrado['genres_names'].apply(len).mean()
+        st.metric("🎭 Géneros Promedio por Juego", f"{avg_genres:.1f}")
+
+    with col4:
+        avg_platforms = df_filtrado['platforms_names'].apply(len).mean()
+        st.metric("🖥️ Plataformas Promedio por Juego", f"{avg_platforms:.1f}")
+
     st.markdown("---")
 
     # =============================
@@ -178,42 +245,98 @@ try:
     st.markdown("---")
 
     # =============================
-    # SEGUNDA FILA
+    # TERCERA FILA - DESARROLLADORES Y PUBLISHERS
     # =============================
+
+    st.subheader("🏗️ Análisis de Desarrolladores y Publishers")
 
     col1, col2 = st.columns(2)
 
     with col1:
+        # Top Desarrolladores
+        dev_counts = df_filtrado['developers_names'].explode().value_counts().head(10)
 
-        fig = px.histogram(
-            df_filtrado,
-            x="rating",
-            nbins=20,
-            title="Distribución de Ratings"
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
+        if not dev_counts.empty:
+            fig = px.bar(
+                dev_counts.reset_index(),
+                x="count",
+                y="developers_names",
+                orientation="h",
+                color="count",
+                color_continuous_scale="Blues",
+                title="Top 10 Desarrolladores"
+            )
+            fig.update_layout(yaxis_title="Desarrollador", xaxis_title="Cantidad de Juegos")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay datos de desarrolladores")
 
     with col2:
+        # Top Publishers
+        pub_counts = df_filtrado['publishers_names'].explode().value_counts().head(10)
 
-        juegos_por_año = (
-            df_filtrado
-            .groupby(df_filtrado['fecha_lanzamiento'].dt.year)
-            .size()
-            .reset_index(name="Cantidad")
-        )
+        if not pub_counts.empty:
+            fig = px.bar(
+                pub_counts.reset_index(),
+                x="count",
+                y="publishers_names",
+                orientation="h",
+                color="count",
+                color_continuous_scale="Greens",
+                title="Top 10 Publishers"
+            )
+            fig.update_layout(yaxis_title="Publisher", xaxis_title="Cantidad de Juegos")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay datos de publishers")
 
-        juegos_por_año.columns = ["Año", "Cantidad"]
+    st.markdown("---")
 
-        fig = px.line(
-            juegos_por_año,
-            x="Año",
-            y="Cantidad",
-            markers=True,
-            title="Juegos por Año"
-        )
+    # =============================
+    # CUARTA FILA - GÉNEROS Y PLATAFORMAS
+    # =============================
 
-        st.plotly_chart(fig, use_container_width=True)
+    st.subheader("🎭 Análisis de Géneros y Plataformas")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Top Géneros
+        genre_counts = df_filtrado['genres_names'].explode().value_counts().head(10)
+
+        if not genre_counts.empty:
+            fig = px.bar(
+                genre_counts.reset_index(),
+                x="count",
+                y="genres_names",
+                orientation="h",
+                color="count",
+                color_continuous_scale="Purples",
+                title="Top 10 Géneros"
+            )
+            fig.update_layout(yaxis_title="Género", xaxis_title="Cantidad de Juegos")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay datos de géneros")
+
+    with col2:
+        # Top Plataformas
+        platform_counts = df_filtrado['platforms_names'].explode().value_counts().head(10)
+
+        if not platform_counts.empty:
+            fig = px.bar(
+                platform_counts.reset_index(),
+                x="count",
+                y="platforms_names",
+                orientation="h",
+                color="count",
+                color_continuous_scale="Oranges",
+                title="Top 10 Plataformas"
+            )
+            fig.update_layout(yaxis_title="Plataforma", xaxis_title="Cantidad de Juegos")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay datos de plataformas")
 
     st.markdown("---")
 
@@ -223,11 +346,22 @@ try:
 
     st.subheader("📋 Datos Detallados")
 
-    df_tabla = df_filtrado[['nombre', 'fecha_lanzamiento', 'rating', 'metacritic']].copy()
+    df_tabla = df_filtrado[[
+        'nombre', 'fecha_lanzamiento', 'rating', 'metacritic',
+        'ratings_count', 'added', 'playtime', 'rating_top',
+        'genres_str', 'platforms_str', 'developers_str', 'publishers_str', 'esrb_rating'
+    ]].copy()
 
     df_tabla['fecha_lanzamiento'] = df_tabla['fecha_lanzamiento'].dt.strftime('%Y-%m-%d')
 
     df_tabla = df_tabla.sort_values('rating', ascending=False)
+
+    # Renombrar columnas para mejor display
+    df_tabla.columns = [
+        'Nombre', 'Fecha Lanzamiento', 'Rating', 'Metacritic',
+        'Cantidad Ratings', 'Agregados', 'Tiempo Juego (hrs)', 'Rating Top',
+        'Géneros', 'Plataformas', 'Desarrolladores', 'Publishers', 'Clasificación ESRB'
+    ]
 
     st.dataframe(
         df_tabla,
